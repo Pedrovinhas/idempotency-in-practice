@@ -1,0 +1,138 @@
+### ==================================================
+### Pattern 1: Idempotency Key-Based
+### ==================================================
+
+@baseUrl = http://localhost:8000/api/idempotency-key
+@idempotencyKey1 = test-order-c841821e-fb01-4bc7-a9f5-ef51fbd878a1
+@idempotencyKey2 = test-payment-16d096ef-2d1e-47fb-8ff4-1d9e0ee83256
+
+### ==================================================
+### 1. Create new order (MISS)
+### ==================================================
+# @name createOrder
+POST {{baseUrl}}/order
+Idempotency-Key: {{idempotencyKey1}}
+Content-Type: application/json
+Accept: application/json
+
+{
+  "description": "Pedido de 3 notebooks Dell XPS 15",
+  "amount": 15000.00
+}
+
+### ==================================================
+### 2. Create new order - Duplicate request (HIT)
+### ==================================================
+# Same key - should return cached result
+POST {{baseUrl}}/order
+Idempotency-Key: {{idempotencyKey1}}
+Content-Type: application/json
+Accept: application/json
+
+{
+  "description": "Pedido de 3 notebooks Dell XPS 15",
+  "amount": 15000.00
+}
+
+### ==================================================
+### 3. Create new order - New key (MISS)
+### ==================================================
+# Different key - should process normally
+POST {{baseUrl}}/order
+Idempotency-Key: new-order-{{$randomInt}}
+Content-Type: application/json
+Accept: application/json
+
+{
+  "description": "Pedido de 5 mouses Logitech MX Master",
+  "amount": 450.00
+}
+
+### ==================================================
+### 4. Process Payment - First time (MISS)
+### ==================================================
+# @name processPayment
+POST {{baseUrl}}/payment
+Idempotency-Key: {{idempotencyKey2}}
+Content-Type: application/json
+Accept: application/json
+
+{
+  "description": "Pagamento da fatura #1234",
+  "amount": 2500.50
+}
+
+### ==================================================
+### 5. Process Payment - Duplicate request (HIT)
+### ==================================================
+# CRITICAL: Same key - MUST NOT charge twice!
+POST {{baseUrl}}/payment
+Idempotency-Key: {{idempotencyKey2}}
+Content-Type: application/json
+Accept: application/json
+
+{
+  "description": "Pagamento da fatura #1234",
+  "amount": 2500.50
+}
+
+### ==================================================
+### 6. Process Payment - New transaction (MISS)
+### ==================================================
+POST {{baseUrl}}/payment
+Idempotency-Key: payment-{{$guid}}
+Content-Type: application/json
+Accept: application/json
+
+{
+  "description": "Pagamento da fatura #5678",
+  "amount": 999.99
+}
+
+### ==================================================
+### 7. Error - Missing idempotency header
+### ==================================================
+# Should return error 400
+POST {{baseUrl}}/order
+Content-Type: application/json
+Accept: application/json
+
+{
+  "description": "Pedido sem chave de idempotência",
+  "amount": 100.00
+}
+
+### ==================================================
+### 8. Cleanup expired keys
+### ==================================================
+# @name cleanup
+DELETE {{baseUrl}}/cleanup
+Accept: application/json
+
+### ==================================================
+### Concurrency Test (parallel execution)
+### ==================================================
+# Execute this request TWICE in parallel
+# Both must use the SAME key
+
+### Request A
+POST {{baseUrl}}/order
+Idempotency-Key: concurrent-test-001
+Content-Type: application/json
+Accept: application/json
+
+{
+  "description": "Teste de concorrência",
+  "amount": 100.00
+}
+
+### Request B (same key!)
+POST {{baseUrl}}/order
+Idempotency-Key: concurrent-test-001
+Content-Type: application/json
+Accept: application/json
+
+{
+  "description": "Teste de concorrência",
+  "amount": 100.00
+}
