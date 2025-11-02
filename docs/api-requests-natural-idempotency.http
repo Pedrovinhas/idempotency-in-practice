@@ -1,0 +1,114 @@
+### ==================================================
+### Padrão 2: Natural Idempotency
+### ==================================================
+
+@baseUrl = http://localhost:8000/api/natural-idempotency
+
+### ==================================================
+### 1. Create Product with POST (NOT idempotent)
+### ==================================================
+# @name createProduct
+POST {{baseUrl}}/products
+Content-Type: application/json
+Accept: application/json
+
+{
+  "name": "Notebook Dell XPS 15",
+  "description": "Notebook profissional com Intel i7",
+  "price": 8500.00,
+  "stock": 15,
+  "active": true
+}
+
+### ==================================================
+### 2. Create Product - Duplicate POST (creates NEW product)
+### ==================================================
+# POST is NOT idempotent - will create another product
+POST {{baseUrl}}/products
+Content-Type: application/json
+Accept: application/json
+
+{
+  "name": "Notebook Dell XPS 15",
+  "description": "Notebook profissional com Intel i7",
+  "price": 8500.00,
+  "stock": 15,
+  "active": true
+}
+
+### ==================================================
+### 3. GET Product (safe and idempotent)
+### ==================================================
+# Replace with actual UUID from previous response
+@productUuid = COLE-O-UUID-AQUI
+
+GET {{baseUrl}}/products/{{productUuid}}
+Accept: application/json
+
+### ==================================================
+### 4. Update Product with PUT (IDEMPOTENT)
+### ==================================================
+# PUT is naturally idempotent - same result if executed multiple times
+PUT {{baseUrl}}/products/{{productUuid}}
+Content-Type: application/json
+Accept: application/json
+
+{
+  "name": "Notebook Dell XPS 15 - ATUALIZADO",
+  "description": "Notebook profissional com Intel i9 e 32GB RAM",
+  "price": 12000.00,
+  "stock": 10,
+  "active": true
+}
+
+### ==================================================
+### 5. Update Product - Execute PUT again (same result)
+### ==================================================
+# Execute this multiple times - always same final state
+PUT {{baseUrl}}/products/{{productUuid}}
+Content-Type: application/json
+Accept: application/json
+
+{
+  "name": "Notebook Dell XPS 15 - ATUALIZADO",
+  "description": "Notebook profissional com Intel i9 e 32GB RAM",
+  "price": 12000.00,
+  "stock": 10,
+  "active": true
+}
+
+### ==================================================
+### 6. Update non-existent product (returns 404)
+### ==================================================
+PUT {{baseUrl}}/products/{{$guid}}
+Content-Type: application/json
+Accept: application/json
+
+{
+  "name": "Produto Inexistente",
+  "price": 100.00,
+  "stock": 1,
+  "active": true
+}
+
+### ==================================================
+### 7. Delete Product with DELETE (IDEMPOTENT)
+### ==================================================
+# First DELETE - removes the product (soft delete)
+DELETE {{baseUrl}}/products/{{productUuid}}
+Accept: application/json
+
+### ==================================================
+### 8. Delete Product - Execute DELETE again (idempotent)
+### ==================================================
+# Second DELETE - returns 404 (consistent state)
+# Execute multiple times - always 404 (product already deleted)
+DELETE {{baseUrl}}/products/{{productUuid}}
+Accept: application/json
+
+### ==================================================
+### 9. Delete non-existent product (idempotent)
+### ==================================================
+# DELETE on non-existent resource is idempotent
+DELETE {{baseUrl}}/products/{{$guid}}
+Accept: application/json
