@@ -1,0 +1,177 @@
+### ==================================================
+### Padrão 3: Version-Based (Optimistic Locking)
+### ==================================================
+
+@baseUrl = http://localhost:8000/api/version-based
+
+### ==================================================
+### 1. Create Configuration (version starts at 1)
+### ==================================================
+# @name createConfig
+POST {{baseUrl}}/configurations
+Content-Type: application/json
+Accept: application/json
+
+{
+  "key": "site_name",
+  "value": "My Application",
+  "updated_by": "user1"
+}
+
+### ==================================================
+### 2. List All Configurations
+### ==================================================
+GET {{baseUrl}}/configurations
+Accept: application/json
+
+### ==================================================
+### 3. Get Specific Configuration
+### ==================================================
+# Replace with actual key from previous response
+@configKey = site_name
+
+GET {{baseUrl}}/configurations/{{configKey}}
+Accept: application/json
+
+### ==================================================
+### 4. Update Configuration - Success (correct version)
+### ==================================================
+# IMPORTANT: Must provide current version
+PUT {{baseUrl}}/configurations/{{configKey}}
+Content-Type: application/json
+Accept: application/json
+
+{
+  "value": "My Updated Application",
+  "version": 1,
+  "updated_by": "user2"
+}
+
+### ==================================================
+### 5. Update Configuration - Version Conflict (409)
+### ==================================================
+# This will fail because version is outdated
+PUT {{baseUrl}}/configurations/{{configKey}}
+Content-Type: application/json
+Accept: application/json
+
+{
+  "value": "Another Update",
+  "version": 1,
+  "updated_by": "user3"
+}
+
+### ==================================================
+### 6. Concurrent Updates Scenario
+### ==================================================
+
+# Step 1: Create a new configuration
+# @name createForConcurrency
+POST {{baseUrl}}/configurations
+Content-Type: application/json
+Accept: application/json
+
+{
+  "key": "api_timeout",
+  "value": "30",
+  "updated_by": "user1"
+}
+
+### Step 2: User A reads configuration (version: 1)
+GET {{baseUrl}}/configurations/api_timeout
+Accept: application/json
+
+### Step 3: User B also reads configuration (version: 1)
+GET {{baseUrl}}/configurations/api_timeout
+Accept: application/json
+
+### Step 4: User A updates first (SUCCESS - version 1 → 2)
+PUT {{baseUrl}}/configurations/api_timeout
+Content-Type: application/json
+Accept: application/json
+
+{
+  "value": "45",
+  "version": 1,
+  "updated_by": "userA"
+}
+
+### Step 5: User B tries to update (CONFLICT - still has version 1)
+PUT {{baseUrl}}/configurations/api_timeout
+Content-Type: application/json
+Accept: application/json
+
+{
+  "value": "60",
+  "version": 1,
+  "updated_by": "userB"
+}
+
+### Step 6: User B gets latest version and updates again (SUCCESS)
+GET {{baseUrl}}/configurations/api_timeout
+Accept: application/json
+
+### Step 7: User B updates with correct version (version 2 → 3)
+PUT {{baseUrl}}/configurations/api_timeout
+Content-Type: application/json
+Accept: application/json
+
+{
+  "value": "60",
+  "version": 2,
+  "updated_by": "userB"
+}
+
+### ==================================================
+### 7. Multiple Sequential Updates
+### ==================================================
+# Create configuration
+# @name createSequential
+POST {{baseUrl}}/configurations
+Content-Type: application/json
+Accept: application/json
+
+{
+  "key": "theme",
+  "value": "light",
+  "updated_by": "admin"
+}
+
+### First update (1 → 2)
+PUT {{baseUrl}}/configurations/theme
+Content-Type: application/json
+Accept: application/json
+
+{
+  "value": "dark",
+  "version": 1,
+  "updated_by": "admin"
+}
+
+### Second update (2 → 3)
+PUT {{baseUrl}}/configurations/theme
+Content-Type: application/json
+Accept: application/json
+
+{
+  "value": "blue",
+  "version": 2,
+  "updated_by": "admin"
+}
+
+### Third update (3 → 4)
+PUT {{baseUrl}}/configurations/theme
+Content-Type: application/json
+Accept: application/json
+
+{
+  "value": "auto",
+  "version": 3,
+  "updated_by": "admin"
+}
+
+### ==================================================
+### 8. Delete Configuration
+### ==================================================
+DELETE {{baseUrl}}/configurations/theme
+Accept: application/json
